@@ -4,10 +4,10 @@
 ```mermaid
 stateDiagram
     direction LR
-    Sleep --> Idle: Single
-    Idle --> Conversation: Double
-    Idle --> Stimulate: Long
-    Idle --> Idle: Single
+    Sleep --> Status: Single
+    Status --> Conversation: Double
+    Status --> Stimulate: Long
+    Status --> Status: Single
     Conversation --> Conversation: Single
     Stimulate --> Stimulate: Single
     Timeout --> Sleep
@@ -16,22 +16,22 @@ stateDiagram
 ### Happiness
 ```mermaid
 stateDiagram
-    Idle --> Ignore: Decrease
+    Status --> Ignore: Decrease
     Sleep --> Ignore: Decrease
-    Sleep --> Idle: Increase
-    Idle --> Game
-    Game --> Idle: Increase
+    Sleep --> Status: Increase
+    Status --> Game
+    Game --> Status: Increase
 
 ```
 
 ### Pet Game
 ```mermaid
 stateDiagram
-    Idle --> Pet: Click
-    Pet --> Idle
+    Status --> Pet: Click
+    Pet --> Status
     OverStimulated: Over Stimulated
-    Idle --> OverStimulated: Click
-    OverStimulated --> Idle: Delay Function
+    Status --> OverStimulated: Click
+    OverStimulated --> Status: Decrease Happiness
 
 ```
 
@@ -68,6 +68,8 @@ stateDiagram
     Delay --> Stimulate: Click
     Stimulate --> Show
     Stimulate --> Rainbow: Satisfied
+    Rainbow --> Annoyed: Click
+    Annoyed --> Rainbow
 ```
 
 ### Stimulate M
