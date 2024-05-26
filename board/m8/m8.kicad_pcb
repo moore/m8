@@ -3429,7 +3429,7 @@
 				(justify mirror)
 			)
 		)
-		(pad "1" thru_hole rect
+		(pad "1" thru_hole circle
 			(at 0 0 270)
 			(size 2 2)
 			(drill 1)
@@ -3488,7 +3488,7 @@
 		)
 	)
 	(gr_text "Give"
-		(at 136 107.5 270)
+		(at 136 108 270)
 		(layer "F.SilkS")
 		(uuid "a20fb718-10ed-4a57-96f8-0b75e6d56b40")
 		(effects
