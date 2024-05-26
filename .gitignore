@@ -4,3 +4,23 @@
 *.hex
 *.lst
 *.map
+
+# Files to not add
+CH32V003RM.pdf
+
+# KiCad Temporary files
+*.000
+*.bak
+*.bck
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*-backups
+*.kicad_prl
+*.sch-bak
+~m8.kicad_*.lck
+\#auto_saved_files\#
+_autosave-*
+*.tmp
+*-save.pro
+*-save.kicad_pcb
+fp-info-cache

@@ -11,6 +11,11 @@
 #define GREEN_LED 2
 #define BLUE_LED 3
 
+typedef struct state_t {
+	uint32_t health;
+	uint32_t last_decay;
+} State;
+
 int main()
 {
 	SystemInit();
@@ -19,6 +24,8 @@ int main()
 	// Otherwise if the device enters standby mode we can't 
 	// program it any more.
 	Delay_Ms(5000);
+
+	State state = {0, SysTick->CNT};
 
 	// Enable GPIOs
 	RCC->APB2PCENR |= RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC;
