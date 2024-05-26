@@ -3488,7 +3488,7 @@
 		)
 	)
 	(gr_text "Give"
-		(at 136 108 270)
+		(at 135.9 107.4 270)
 		(layer "F.SilkS")
 		(uuid "a20fb718-10ed-4a57-96f8-0b75e6d56b40")
 		(effects
