@@ -17,7 +17,7 @@ CH32V003RM.pdf
 *-backups
 *.kicad_prl
 *.sch-bak
-~m8.kicad_*.lck
+~*.lck
 \#auto_saved_files\#
 _autosave-*
 *.tmp
