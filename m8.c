@@ -28,14 +28,23 @@ int main()
 	State state = {0, SysTick->CNT};
 
 	// Enable GPIOs
-	RCC->APB2PCENR |= RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC;
+	RCC->APB2PCENR |= RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOD | RCC_APB2Periph_GPIOC;
 
 	
-	GPIO_CONFIG_OUT_PP(C, RED_LED, GREEN_LED, BLUE_LED);
-	GPIO_CONFIG_OUT_PP(D, BOARD_LED, BUZZER);
+	GPIO_CONFIG_OUT_PP(A, 0, 1, 2, 3, 4, 5, 6, 7);
+	GPIO_CONFIG_OUT_PP(C,    RED_LED, GREEN_LED, BLUE_LED, 4, 5, 6, 7);
+	GPIO_CONFIG_OUT_PP(D, 0, 1, 2, 3, BUZZER, 5, 6, 7);
+
 
 	GPIO_CONFIG_ONE_IN_PUPD(C, SWICH);
 	GPIOC->BSHR |= GPIO_BSHR_BS0;
+
+
+	// Set everything to low so it's not floating.
+	// This is required to achieve low poser in standby.
+	SET_GPIO(D, OFF(0)|OFF(1)|OFF(2)|OFF(3)|OFF(4)|OFF(5)|OFF(6)|OFF(7));
+	SET_GPIO(C,        OFF(1)|OFF(2)|OFF(3)|OFF(4)|OFF(5)|OFF(6)|OFF(7));
+	SET_GPIO(D, OFF(0)|OFF(1)|OFF(2)|OFF(3)|OFF(4)|OFF(5)|OFF(6)|OFF(7));
 
 	// AFIO is needed for EXTI
 	RCC->APB2PCENR |= RCC_AFIOEN;
