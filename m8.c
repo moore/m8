@@ -7,19 +7,25 @@
 
 // GPIO C
 #define SWICH 0
-#define RED_LED 1
-#define GREEN_LED 2
+#define GREEN_LED 1
+#define RED_LED 2
 #define BLUE_LED 3
 
-#define LED_FREQ 10000
+#define LED_PWM_FREQ 10000
 
 typedef struct led_state_t
 {
-	uint8_t on;
-	uint16_t start_value;
-	uint16_t end_value;
 	uint32_t start_ticks;
-	uint32_t duration_ticks;
+	uint16_t start_value;
+
+	uint16_t attack_value;
+	uint32_t attack_duration_ticks;
+
+	uint16_t sustain_value;
+	uint32_t sustain_duration_ticks;
+	
+	uint16_t release_value;
+	uint32_t release_duration_ticks;
 } LedState;
 
 
@@ -50,19 +56,19 @@ uint32_t compute_value(
 	uint32_t duration_ticks,
 	uint32_t start_ticks,
 	uint32_t start_value, 
-	uint32_t end_value
+	uint32_t attack_value
 	) {
 		uint32_t end_ticks = start_ticks + duration_ticks;
 
 		if (now_ticks >= end_ticks ) {
-			return end_value;
+			return attack_value;
 		}
 
-		uint16_t change = abs(end_value - start_value);
+		uint16_t change = abs(((int32_t)attack_value) - (int32_t)start_value);
 		float percent = ((float)(now_ticks - start_ticks))/((float)duration_ticks);
 		uint32_t delta = (uint32_t)(change * percent);
 
-		if (start_value < end_value) {
+		if (start_value < attack_value) {
 			return start_value + delta;
 		} else {
 			return start_value - delta;
@@ -71,31 +77,48 @@ uint32_t compute_value(
 
 
 int check_led(int pin, uint32_t now, LedState* led, int* done) {
+	uint32_t attack_start_ticks = led->start_ticks;
+	uint32_t attack_end_ticks = led->start_ticks + led->attack_duration_ticks;
+	uint32_t sustain_end_ticks = attack_end_ticks + led->sustain_duration_ticks;
+	uint32_t release_end_ticks = sustain_end_ticks + led->release_duration_ticks;
 
-	if (!led->on) {
-		return OFF(pin);
-	}
 
-	if (now > (led->start_ticks + led->duration_ticks)) {
-		led->on = 0;
+	if (now > release_end_ticks) {
 		return OFF(pin);
 	}
 
 	*done = 0;
 
-	if (now < led->start_ticks) {
+	if (now < attack_start_ticks) {
 		return OFF(pin); 
 	}
 
-	uint32_t duty = compute_value(
-		now,
-		led->duration_ticks,
-		led->start_ticks,
-		led->start_value,
-		led->end_value);
+	uint32_t duty;
 
+	if (now <= attack_end_ticks) {
+		duty = compute_value(
+			now,
+			led->attack_duration_ticks,
+			attack_start_ticks,
+			led->start_value,
+			led->attack_value);
+	} else if (now <= sustain_end_ticks) {
+		duty = compute_value(
+			now,
+			led->sustain_duration_ticks,
+			attack_end_ticks,
+			led->attack_value,
+			led->sustain_value);
+	} else {
+		duty = compute_value(
+			now,
+			led->release_duration_ticks,
+			sustain_end_ticks,
+			led->sustain_value,
+			led->release_value);
+	}
 
-	if (sample_pwm(now, LED_FREQ, duty)) {
+	if (sample_pwm(now, LED_PWM_FREQ, duty)) {
 		return ON(pin);
 	} else {
 		return OFF(pin);
@@ -119,15 +142,25 @@ void set_envelope(
 	LedState* led,
 	uint32_t now,
 	uint32_t delay_ms,
-	uint32_t duration_ms, 
 	uint32_t start_value,
-	uint32_t end_value
+	uint32_t attack_value,
+	uint32_t attack_duration_ms, 
+	uint32_t sustain_value,
+	uint32_t sustain_duration_ms, 
+	uint32_t release_value,
+	uint32_t release_duration_ms
 	) {
-		led->on = 1;
 		led->start_ticks = now + ms_to_ticks(delay_ms);
-		led->duration_ticks = ms_to_ticks(duration_ms);
 		led->start_value = start_value;
-		led->end_value = end_value;
+
+		led->attack_duration_ticks = ms_to_ticks(attack_duration_ms);
+		led->attack_value = attack_value;
+
+		led->sustain_duration_ticks = ms_to_ticks(sustain_duration_ms);
+		led->sustain_value = sustain_value;
+
+		led->release_duration_ticks = ms_to_ticks(release_duration_ms);
+		led->release_value = release_value;
 }
 
 int main()
@@ -194,14 +227,15 @@ int main()
 	{
 		
 		uint32_t now = SysTick->CNT;
-		set_envelope(&state.red,   now,   0, 1000, 100, 8000);
-		set_envelope(&state.green, now, 333,  666, 100, 8000);
-		set_envelope(&state.blue,  now, 666,  333, 100, 8000);
+		set_envelope(&state.red,   now,   0, 100, 8000, 1000, 3000, 500, 100, 125);
+		set_envelope(&state.green, now, 333, 100, 8000,  666, 3000, 500, 100, 125);
+		set_envelope(&state.blue,  now, 666, 100, 8000,  333, 3000, 500, 100, 125);
 
 		int done = 0;
 		while (!done)
 		{
 			done = update_state(&state);
+			Delay_Us(1);
 		}
 		
 		SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
