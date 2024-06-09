@@ -3871,7 +3871,7 @@
 				)
 			)
 		)
-		(property "Value" "10"
+		(property "Value" "1"
 			(at 142.494 82.804 90)
 			(effects
 				(font
@@ -3938,7 +3938,7 @@
 				)
 			)
 		)
-		(property "Value" "10"
+		(property "Value" "1"
 			(at 142.494 72.644 90)
 			(effects
 				(font
