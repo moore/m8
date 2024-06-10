@@ -227,15 +227,14 @@ int main()
 	{
 		
 		uint32_t now = SysTick->CNT;
-		set_envelope(&state.red,   now,   0, 100, 8000, 1000, 3000, 500, 100, 125);
-		set_envelope(&state.green, now, 333, 100, 8000,  666, 3000, 500, 100, 125);
-		set_envelope(&state.blue,  now, 666, 100, 8000,  333, 3000, 500, 100, 125);
+		set_envelope(&state.red,   now,   0, 100, 4000, 250, 1000, 250, 100, 50);
+		set_envelope(&state.green, now, 125, 100, 8000, 125, 3000, 250, 100, 50);
+		set_envelope(&state.blue,  now, 190, 100, 8000,  60, 3000, 250, 100, 50);
 
 		int done = 0;
 		while (!done)
 		{
 			done = update_state(&state);
-			Delay_Us(1);
 		}
 		
 		SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
