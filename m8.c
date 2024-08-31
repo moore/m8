@@ -17,6 +17,7 @@
 
 typedef struct led_state_t
 {
+	uint8_t on;
 	uint32_t start_ticks;
 	uint16_t start_value;
 
@@ -30,10 +31,8 @@ typedef struct led_state_t
 	uint32_t release_duration_ticks;
 } LedState;
 
-const uint32_t DEBOUNCE_DELAY      = 5 * DELAY_MS_TIME;
 const uint32_t LONG_PRESS_DELAY    = 750 * DELAY_MS_TIME;
 const uint32_t DOUBLE_CLICK_WINDOW = 500 * DELAY_MS_TIME;
-
 
 typedef enum button_states_t {
 	StartState,
@@ -89,12 +88,12 @@ typedef struct state_t {
 } State;
 
 typedef enum pin_state_t {
-	Hi,
 	Low,
+	Hi,
 	Cleared,
 } PinState;
 
-#define BUFFER_LEN 10
+#define BUFFER_LEN 3
 typedef struct button_press_t {
 	PinState state;
 	uint32_t ticks;
@@ -104,7 +103,6 @@ typedef struct button_press_t {
 volatile ButtonPress button_buffer[BUFFER_LEN];
 volatile int pointer_head = 0;
 volatile int pointer_tail = 0;
-volatile uint32_t button_debounce_ticks = 0;
 volatile uint32_t button_last_event_ticks = 0;
 
 
@@ -134,9 +132,9 @@ BufferResult read_button(ButtonPress* value) {
 		return Empty;
 	}
 
-	*value = button_buffer[pointer_tail];
-
 	pointer_tail = (pointer_tail + 1) % BUFFER_LEN;
+
+	*value = button_buffer[pointer_tail];
 
 	return Ok;
 }
@@ -178,9 +176,18 @@ uint32_t compute_value(
 		}
 }
 
+PinState read_button_pin() {
+	uint8_t button_is_pressed = GPIO_digitalRead(GPIOv_from_PORT_PIN(GPIO_port_C, SWICH));
+
+	if (button_is_pressed) {
+		return Hi;	
+	} else {
+		return Low;
+	}
+}
+
 ButtonResult check_button(int pin, uint32_t now, Button* button) {
 	ButtonState state = button->state;
-
 	
 	ButtonEvent event = Idle;
 
@@ -199,7 +206,6 @@ ButtonResult check_button(int pin, uint32_t now, Button* button) {
 		button->last_change = now;
 	}	
 
-	// BOOG this should be in the buffer
 	uint32_t long_press_ticks
 		= button->action_start + LONG_PRESS_DELAY;
 	uint32_t double_click_ticks
@@ -207,9 +213,13 @@ ButtonResult check_button(int pin, uint32_t now, Button* button) {
 
 	if (state == StartState) {
 		if (event == Down) {
-			button->action_start = now; //button_last_event_ticks;
+			button->action_start = pin_state.ticks;
 			button->state = PressedState;
 			button->active = 1;
+			long_press_ticks
+				= pin_state.ticks + LONG_PRESS_DELAY;
+	 		double_click_ticks
+				= pin_state.ticks + DOUBLE_CLICK_WINDOW;
 		}
 		// Ignore Up/Idle
 	} else if (state == PressedState) {
@@ -276,6 +286,7 @@ ButtonResult check_button(int pin, uint32_t now, Button* button) {
 		}
 	}
 
+
 	ButtonResult result = {
 		action,
 		button->action_start,
@@ -296,7 +307,7 @@ int check_led(int pin, uint32_t now, LedState* led, int* done) {
 	// If we finish at 0 AKA <= 100 were done and should turn off pin
 	// else just keep running the 
 	if (now > release_end_ticks) {
-		if (led->release_value <= 100) {
+		if (led->release_value <= 100 || !led->on) {
 			return OFF(pin);
 		}
 	} else {
@@ -366,6 +377,7 @@ void set_envelope(
 	uint32_t release_value,
 	uint32_t release_duration_ms
 	) {
+		led->on = 1;
 		led->start_ticks = now + ms_to_ticks(delay_ms);
 		led->start_value = start_value;
 
@@ -403,6 +415,8 @@ void set_long_press_animation(State* state) {
 void set_error_animation(State* state) {
 	uint32_t now = SysTick->CNT;
 	set_envelope(&state->red,  now, 0, 100, 8000, 100, 8000, 3000, 100, 50);
+	state->green.on = 0;
+	state->blue.on = 0;
 }
 
 void set_press_animation(State* state) {
@@ -410,11 +424,12 @@ void set_press_animation(State* state) {
 	set_envelope(&state->red,   now, 0, 100, 4000, 10, 4000, 5, 100, 5);
 	//set_envelope(&state->green, now, 0, 100, 500, 100, 500, 250, 100, 50);
 	//set_envelope(&state->blue,  now, 0, 100, 500, 100, 500, 250, 100, 50);
-
+	state->green.on = 0;
+	state->blue.on = 0;
 }
 
 void start_animation(State* state) {
-uint32_t now = SysTick->CNT;
+	uint32_t now = SysTick->CNT;
 	set_envelope(&state->red,   now,    0, 100, 4000, 750, 4000, 100, 100, 250);
 	set_envelope(&state->green, now,  500, 100, 8000, 750, 8000, 100, 100, 250);
 	set_envelope(&state->blue,  now, 1000, 100, 8000, 500, 8000, 100, 100, 250);
@@ -435,49 +450,40 @@ uint32_t now = SysTick->CNT;
 	}
 }
 
-//void EXTI0_IRQHandler(void) __attribute__((interrupt));
-//void EXTI0_IRQHandler(void)
+void unreachable_error() {
+	SET_GPIO(C, ON(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
+	Delay_Ms(50);
+	SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
+	Delay_Ms(50);
+	SET_GPIO(C, ON(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
+	Delay_Ms(50);
+	SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
+	Delay_Ms(50);
+	SET_GPIO(C, ON(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
+	Delay_Ms(50);
+	SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
+	Delay_Ms(50);
+	SET_GPIO(C, ON(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
+	Delay_Ms(50);
+	SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
+}
+
 void EXTI7_0_IRQHandler(void) __attribute__((interrupt));
 void EXTI7_0_IRQHandler(void)
 {
 	uint32_t now = SysTick->CNT;
 
-	if ((button_debounce_ticks <= now)) {
+	PinState button_pin = read_button_pin();
 
-		uint8_t button_is_pressed = !GPIO_digitalRead(GPIOv_from_PORT_PIN(GPIO_port_C, SWICH));
+	
 
-		button_last_event_ticks = now;
-
-		PinState button_pin = Cleared;
-		if (button_is_pressed) {
-			button_pin = Hi;	
-		} else {
-			button_pin = Low;
-		}
-
-		if(write_button(now, button_pin) != Ok) {
-			// Yell about it
-			SET_GPIO(C, ON(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
-			Delay_Ms(50);
-			SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
-			Delay_Ms(50);
-			SET_GPIO(C, ON(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
-			Delay_Ms(50);
-			SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
-			Delay_Ms(50);
-			SET_GPIO(C, ON(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
-			Delay_Ms(50);
-			SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
-			Delay_Ms(50);
-			SET_GPIO(C, ON(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
-			Delay_Ms(50);
-			SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
-		}
-		
+	button_last_event_ticks = now;
+	
+	if(write_button(now, button_pin) != Ok) {
+		unreachable_error();
 	}
 
-	button_debounce_ticks = now + DEBOUNCE_DELAY;
-
+	
 	// Acknowledge the interrupt
 	EXTI->INTFR = EXTI_Line0;
 }
@@ -539,18 +545,17 @@ int main() {
 		__WFE();
 		SystemInit(); // Reset clocks
 		
-
 		// Interrupt swallows the click so we fake it.
 		Button button = {
 			0,
 			0,
+			0,	
 			0,
-			0,
-			Idle,
+			StartState,
 		};
 		
 		int done = 0;
-		while (!done || button.active) {
+		while ((!done) || button.active) {
 			uint32_t now = SysTick->CNT;
 
 			done = update_state(&state);
@@ -570,9 +575,11 @@ int main() {
 				set_error_animation(&state);
 			} 
 			// Add some sort of sleep to save power
-			Delay_Us(1);
+			//Delay_Us(1);
 		}
-		
+		state.red.on = 0;
+		state.green.on = 0;
+		state.blue.on = 0;
 		SET_GPIO(C, OFF(RED_LED)|OFF(GREEN_LED)|OFF(BLUE_LED));
 	}
 }
